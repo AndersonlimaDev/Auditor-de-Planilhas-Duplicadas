@@ -22,7 +22,7 @@ Tailwind CSS: Framework utilitário para um design responsivo e moderno (single-
 🚀 Como Usar
 Clone o Repositório:
 
-git clone [https://www.youtube.com/watch?v=X49Wz3icO3E](https://www.youtube.com/watch?v=X49Wz3icO3E)
+git clone [https://github.com/AndersonlimaDev/Auditor-de-Planilhas-Duplicadas]
 cd auditor-planilhas
 
 Abra o Arquivo: Simplesmente abra o arquivo index.html em qualquer navegador web moderno.
