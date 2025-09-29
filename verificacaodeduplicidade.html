@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificador de Duplicidade de Planilhas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+        }
+        .container-shadow {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        }
+        .duplicate-row {
+            background-color: #fee2e2 !important; /* Cor de fundo vermelho claro */
+            color: #b91c1c; /* Cor do texto vermelho escuro */
+            font-weight: 600;
+        }
+        .duplicate-row:hover {
+            background-color: #fca5a5 !important;
+        }
+        textarea, .results-table {
+            transition: all 0.3s ease;
+        }
+        /* Estilo para focar na textarea */
+        textarea:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5); /* blue-500 com transparência */
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-3xl md:text-4xl font-extrabold text-blue-700 mb-2">
+                Auditor de Planilhas <span class="text-red-500">Duplicadas</span>
+            </h1>
+            <p class="text-gray-600 text-lg">Cole ou anexe seus dados e identifique rapidamente entradas repetidas.</p>
+        </header>
+
+        <!-- Seção de Entrada de Dados -->
+        <section class="bg-white p-6 md:p-8 rounded-xl container-shadow mb-8">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">1. Insira os Dados da Planilha</h2>
+
+            <!-- Opção de Upload de Arquivo -->
+            <div class="mb-6 p-4 border border-blue-200 bg-blue-50 rounded-xl">
+                <h3 class="font-semibold text-blue-800 mb-2">Opção A: Anexar Arquivo</h3>
+                <p class="text-sm text-gray-600 mb-3">
+                    Selecione um arquivo CSV, TXT ou Excel. **Atenção:** Arquivos Excel serão lidos como texto, é preferível usar o formato CSV.
+                </p>
+                <input type="file" id="fileInput" accept=".csv,.txt,.xlsx,.xls"
+                       class="w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-200 file:text-blue-700 hover:file:bg-blue-300">
+            </div>
+
+            <div class="text-center my-4 text-gray-500 font-bold">OU</div>
+
+            <!-- Opção de Colar Texto Manualmente -->
+            <div class="mb-4">
+                <h3 class="font-semibold text-blue-800 mb-2">Opção B: Colar Conteúdo Manualmente</h3>
+                <p class="text-sm text-gray-600 mb-3">
+                    Cole o conteúdo da sua planilha (Ctrl+C / Ctrl+V). O sistema detectará o separador.
+                </p>
+                <textarea
+                    id="dataInput"
+                    rows="8"
+                    placeholder="Cole aqui os dados da sua planilha. Ex:&#10;ID_Pedido;Produto;Cliente&#10;1001;Teclado;Ana Silva&#10;1002;Mouse;Bruno Costa&#10;1001;Teclado;Ana Silva"
+                    class="w-full p-4 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 resize-y text-sm"
+                ></textarea>
+            </div>
+
+            <button
+                onclick="loadData()"
+                id="loadButton"
+                class="mt-4 w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition duration-200 shadow-md hover:shadow-lg transform hover:scale-[1.005]"
+            >
+                Carregar Dados e Selecionar Colunas
+            </button>
+        </section>
+
+        <!-- Seção de Seleção de Colunas -->
+        <section id="columnSelectionSection" class="bg-white p-6 md:p-8 rounded-xl container-shadow mb-8 hidden">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">2. Escolha as Colunas para Verificação</h2>
+            <p class="text-sm text-gray-500 mb-4">
+                Selecione as colunas que, quando combinadas, **não podem** ter o mesmo valor (o "ID" do seu pedido).
+            </p>
+            <div id="columnCheckboxes" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <!-- Checkboxes serão inseridos aqui pelo JavaScript -->
+            </div>
+            <button
+                onclick="processDuplicates()"
+                id="processButton"
+                class="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition duration-200 shadow-md hover:shadow-lg transform hover:scale-[1.005] disabled:bg-red-300"
+                disabled
+            >
+                <span id="processText">Verificar Duplicatas Selecionadas (0)</span>
+            </button>
+        </section>
+
+        <!-- Seção de Resultados -->
+        <section id="resultsSection" class="bg-white p-6 md:p-8 rounded-xl container-shadow mb-8 hidden">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">3. Resultado da Análise</h2>
+            <div id="summary" class="mb-4 text-lg font-medium"></div>
+            <div class="overflow-x-auto rounded-lg border border-gray-200">
+                <table id="resultsTable" class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr id="tableHeader">
+                            <!-- Cabeçalhos serão inseridos aqui -->
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="bg-white divide-y divide-gray-200">
+                        <!-- Linhas de dados serão inseridas aqui -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Área de Mensagem de Erro/Status -->
+        <div id="messageArea" class="mt-4 p-4 text-sm rounded-lg text-center hidden" role="alert"></div>
+
+    </div>
+
+    <script>
+        // Variável global para armazenar os dados processados
+        let sheetData = [];
+        let sheetHeaders = [];
+        const processButton = document.getElementById('processButton');
+        const processText = document.getElementById('processText');
+        const messageArea = document.getElementById('messageArea');
+        const columnSelectionSection = document.getElementById('columnSelectionSection');
+        const resultsSection = document.getElementById('resultsSection');
+        const fileInput = document.getElementById('fileInput'); // Novo elemento
+
+        /**
+         * Encontra o delimitador mais provável no texto de entrada.
+         * @param {string} text - O texto de entrada da planilha.
+         * @returns {string} O delimitador detectado (',', ';', '\t') ou ','.
+         */
+        function detectDelimiter(text) {
+            const delimiters = [',', ';', '\t'];
+            let bestDelimiter = ',';
+            let maxCount = -1;
+
+            for (const delimiter of delimiters) {
+                // Apenas verifica a primeira linha para detecção do delimitador
+                const count = text.split('\n')[0].split(delimiter).length;
+                if (count > maxCount) {
+                    maxCount = count;
+                    bestDelimiter = delimiter;
+                }
+            }
+            return bestDelimiter;
+        }
+
+        /**
+         * Converte o texto colado em um array de objetos (dados da planilha).
+         * @param {string} dataText - O texto bruto da planilha.
+         */
+        function parseData(dataText) {
+            if (!dataText.trim()) {
+                showMessage('danger', 'Por favor, cole os dados da planilha na caixa de texto.');
+                return { headers: [], data: [] };
+            }
+
+            const lines = dataText.trim().split('\n').filter(line => line.trim() !== '');
+            if (lines.length < 2) {
+                showMessage('danger', 'Dados insuficientes. Por favor, cole pelo menos um cabeçalho e uma linha de dados.');
+                return { headers: [], data: [] };
+            }
+
+            const delimiter = detectDelimiter(dataText);
+
+            // A primeira linha é sempre o cabeçalho
+            const headers = lines[0].split(delimiter).map(h => h.trim());
+
+            const data = [];
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(delimiter).map(v => v.trim());
+                if (values.length === headers.length) {
+                    const row = {};
+                    headers.forEach((header, index) => {
+                        row[header] = values[index];
+                    });
+                    data.push(row);
+                } else {
+                    // Ignora linhas mal formatadas
+                    console.warn(`Linha ${i + 1} ignorada devido a número incorreto de colunas.`);
+                }
+            }
+
+            return { headers, data };
+        }
+
+        /**
+         * Lida com a leitura do arquivo carregado.
+         * @param {File} file - O objeto File.
+         * @returns {Promise<string>} Promessa que resolve com o conteúdo de texto do arquivo.
+         */
+        function readUploadedFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+
+                reader.onload = (event) => {
+                    resolve(event.target.result);
+                };
+
+                reader.onerror = (error) => {
+                    reject('Erro ao ler o arquivo.');
+                };
+
+                // Lê o arquivo como texto (útil para CSV e TXT)
+                reader.readAsText(file);
+            });
+        }
+
+        /**
+         * Carrega os dados da textarea ou do arquivo e renderiza a seleção de colunas.
+         */
+        async function loadData() {
+            let dataText = document.getElementById('dataInput').value;
+            let source = 'manual';
+
+            // 1. Verificar se há um arquivo carregado e priorizá-lo
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                try {
+                    showMessage('info', `Lendo arquivo: ${file.name}...`, false);
+                    // Adiciona uma pequena pausa para garantir que a mensagem 'Lendo arquivo...' apareça
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    dataText = await readUploadedFile(file);
+                    source = 'file';
+                } catch (error) {
+                    showMessage('danger', `Erro ao processar o arquivo. Verifique se é um CSV/TXT válido.`);
+                    // Limpa o input de arquivo após erro
+                    fileInput.value = ''; 
+                    return;
+                }
+            }
+
+            // Se não houver dados, não prosseguir
+            if (!dataText.trim()) {
+                showMessage('danger', 'Por favor, insira os dados manualmente ou carregue um arquivo.', true);
+                return;
+            }
+
+            const parsed = parseData(dataText);
+
+            sheetHeaders = parsed.headers;
+            sheetData = parsed.data;
+
+            if (sheetData.length === 0) {
+                showMessage('danger', 'Nenhuma linha de dados válida foi encontrada. Verifique o separador e o formato da planilha.', true);
+                columnSelectionSection.classList.add('hidden');
+                resultsSection.classList.add('hidden');
+                return;
+            }
+
+            const fileName = source === 'file' ? ` (${fileInput.files[0].name})` : '';
+            showMessage('success', `Dados${fileName} carregados com sucesso! ${sheetData.length} linhas e ${sheetHeaders.length} colunas encontradas.`, true);
+            
+            // Limpa o campo manual se o arquivo foi carregado com sucesso
+            if (source === 'file') {
+                 document.getElementById('dataInput').value = '';
+            } else {
+                 // Limpa o input de arquivo se o campo manual foi usado
+                 fileInput.value = '';
+            }
+
+
+            renderColumnSelectors();
+            columnSelectionSection.classList.remove('hidden');
+            resultsSection.classList.add('hidden');
+        }
+
+        /**
+         * Cria os checkboxes para selecionar as colunas de verificação.
+         */
+        function renderColumnSelectors() {
+            const container = document.getElementById('columnCheckboxes');
+            container.innerHTML = '';
+            processButton.disabled = true;
+            processText.textContent = 'Verificar Duplicatas Selecionadas (0)';
+
+            sheetHeaders.forEach(header => {
+                const checkboxHtml = `
+                    <label class="inline-flex items-center p-2 bg-gray-100 rounded-lg hover:bg-gray-200 cursor-pointer transition duration-150">
+                        <input type="checkbox" name="duplicateCheckColumn" value="${header}" class="form-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300">
+                        <span class="ml-2 text-sm font-medium text-gray-700">${header}</span>
+                    </label>
+                `;
+                container.innerHTML += checkboxHtml;
+            });
+
+            // Adiciona listener para contar e habilitar o botão
+            document.querySelectorAll('input[name="duplicateCheckColumn"]').forEach(checkbox => {
+                checkbox.addEventListener('change', updateProcessButtonState);
+            });
+        }
+
+        /**
+         * Atualiza o texto e estado do botão de processamento.
+         */
+        function updateProcessButtonState() {
+            const selectedColumns = getSelectedColumns();
+            processText.textContent = `Verificar Duplicatas Selecionadas (${selectedColumns.length})`;
+            processButton.disabled = selectedColumns.length === 0;
+        }
+
+        /**
+         * Retorna um array com os nomes das colunas selecionadas.
+         */
+        function getSelectedColumns() {
+            return Array.from(document.querySelectorAll('input[name="duplicateCheckColumn"]:checked')).map(cb => cb.value);
+        }
+
+        /**
+         * Lógica principal para encontrar duplicatas.
+         */
+        function processDuplicates() {
+            const selectedColumns = getSelectedColumns();
+
+            if (selectedColumns.length === 0) {
+                showMessage('warning', 'Selecione pelo menos uma coluna para verificar duplicatas.');
+                return;
+            }
+
+            const keyCounts = {};
+            const duplicateKeys = new Set();
+            const results = sheetData.map((row, index) => {
+                // Cria uma chave composta com os valores das colunas selecionadas
+                const key = selectedColumns.map(col => row[col]).join('|---|');
+
+                if (key in keyCounts) {
+                    keyCounts[key] += 1;
+                    duplicateKeys.add(key);
+                } else {
+                    keyCounts[key] = 1;
+                }
+
+                // Adiciona o key para referência futura
+                row._key = key;
+                row._originalIndex = index;
+                return row;
+            });
+
+            const duplicatedRows = results.filter(row => duplicateKeys.has(row._key));
+            const uniqueCount = sheetData.length - duplicatedRows.length;
+
+            renderResults(results, duplicateKeys, duplicatedRows.length);
+            resultsSection.classList.remove('hidden');
+        }
+
+        /**
+         * Renderiza a tabela de resultados e o resumo.
+         * @param {Array<Object>} results - O array completo de dados.
+         * @param {Set<string>} duplicateKeys - Conjunto de chaves compostas que são duplicadas.
+         * @param {number} duplicateCount - Contagem total de linhas duplicadas.
+         */
+        function renderResults(results, duplicateKeys, duplicateCount) {
+            const tableHeader = document.getElementById('tableHeader');
+            const tableBody = document.getElementById('tableBody');
+            const summary = document.getElementById('summary');
+
+            // 1. Renderiza o Resumo
+            summary.innerHTML = `
+                <p class="${duplicateCount > 0 ? 'text-red-600' : 'text-green-600'}">
+                    ${duplicateCount > 0
+                        ? `⚠️ **Foram encontradas ${duplicateCount} linhas duplicadas** baseadas nas colunas selecionadas.`
+                        : `✅ **Nenhuma duplicidade encontrada** em ${results.length} registros.`
+                    }
+                </p>
+            `;
+
+            // 2. Renderiza o Cabeçalho
+            tableHeader.innerHTML = sheetHeaders.map(header => `
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    ${header}
+                </th>
+            `).join('');
+
+            // 3. Renderiza o Corpo da Tabela
+            tableBody.innerHTML = '';
+            results.forEach(row => {
+                const isDuplicate = duplicateKeys.has(row._key);
+                const rowClass = isDuplicate ? 'duplicate-row' : 'hover:bg-gray-50';
+
+                const rowHtml = `
+                    <tr class="${rowClass}">
+                        ${sheetHeaders.map(header => `
+                            <td class="px-6 py-4 whitespace-nowrap text-sm ${isDuplicate ? 'font-bold' : 'text-gray-900'}">
+                                ${row[header]}
+                            </td>
+                        `).join('')}
+                    </tr>
+                `;
+                tableBody.innerHTML += rowHtml;
+            });
+
+            showMessage('info', `Análise concluída. ${duplicateCount} linhas destacadas em vermelho.`, true);
+        }
+
+        /**
+         * Exibe ou esconde mensagens de status.
+         * @param {('success'|'danger'|'warning'|'info')} type - Tipo da mensagem.
+         * @param {string} message - O texto da mensagem.
+         * @param {boolean} autoHide - Se deve sumir automaticamente.
+         */
+        function showMessage(type, message, autoHide = false) {
+            const classes = {
+                success: 'bg-green-100 border-green-400 text-green-700',
+                danger: 'bg-red-100 border-red-400 text-red-700',
+                warning: 'bg-yellow-100 border-yellow-400 text-yellow-700',
+                info: 'bg-blue-100 border-blue-400 text-blue-700'
+            };
+
+            messageArea.className = `mt-4 p-4 border rounded-lg text-center ${classes[type]}`;
+            messageArea.innerHTML = `<strong>${message}</strong>`;
+            messageArea.classList.remove('hidden');
+
+            if (autoHide) {
+                setTimeout(() => messageArea.classList.add('hidden'), 5000);
+            }
+        }
+
+        // Garante que o estado inicial é limpo
+        document.addEventListener('DOMContentLoaded', () => {
+            columnSelectionSection.classList.add('hidden');
+            resultsSection.classList.add('hidden');
+        });
+
+    </script>
+</body>
+</html>
